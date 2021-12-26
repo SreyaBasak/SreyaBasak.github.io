@@ -1,0 +1,101 @@
+------------------------------------------------------------------------------GROUP CONCAT-----------------------------------------------------------------------
+SELECT * FROM region_date_delivered;
+
+SET SQL_SAFE_UPDATES = 0;
+/*Converting the date format from string to date and then to the desired date format*/
+UPDATE region_date_delivered
+SET DateofRSPS = date_format(str_to_date(DateOfRSPS,'%d-%b-%Y'),'%d-%b-%Y');
+/*Pivot table using case when*/
+Create view Ecom_region as (
+ SELECT `Region-zone` as Regions , `Hub Name` , FHRID, `DeliveryType`,
+coalesce(sum((case when DateOfRSPS = "01-May-2020" then delivered end)), ' ') as "01-May-2020",
+    coalesce(sum((case when DateOfRSPS = "02-May-2020" then delivered end)), ' ') as "02-May-2020",
+    coalesce(sum((case when DateOfRSPS = "03-May-2020" then delivered end)), ' ') as "03-May-2020",
+    coalesce(sum((case when DateOfRSPS = "04-May-2020" then delivered end)), ' ') as "04-May-2020",
+    coalesce(sum((case when DateOfRSPS = "05-May-2020" then delivered end)), ' ') as "05-May-2020"
+  from region_date_delivered
+  Group by FHRID
+  Order by `Hub Name`,FHRID, delivered desc );
+   Select 
+     Regions , `Hub Name` , FHRID, `DeliveryType`,`01-May-2020`,`02-May-2020`,`03-May-2020`,`04-May-2020`,`05-May-2020`,
+     (`01-May-2020`+`02-May-2020`+`03-May-2020`+`04-May-2020`+`05-May-2020`) as GrandTotal
+     FROM Ecom_region
+UNION
+SELECT 'GrandTotal','','','',sum(`01-May-2020`),sum(`02-May-2020`),sum(`03-May-2020`),sum(`04-May-2020`),sum(`05-May-2020`),
+sum(`01-May-2020`)+sum(`02-May-2020`)+sum(`03-May-2020`)+sum(`04-May-2020`)+sum(`05-May-2020`) 
+FROM Ecom_region;
+
+/*Pivot table using group_concat*/
+/* Objective: To calculate the number of items delivered from May 1,2020 to May 5,2020 (it can be whole year round) with 
+respect to regions, HubName, FHRID, DeliveryType */
+/* Step 1: Initialize the variable */
+Set @r1:=0 ;
+/* Step 2: Here we will do the actual pivot operation using the column (here DateofRSPS) which we actually want to transpose to row
+group concat the sum-if query to pivot the column 'DateofRSPS' in single quotes using distinct concat so that only the unique values of 
+ DateofRSPS get concatenated with the query and ordering them in ascending order of month. Store the concatenated query into r1 variable initialized above
+ Using ifnull to remove all the null values from the pivot table*/
+SELECT group_concat( distinct concat( 'ifnull(sum(if(DateOfRSPS="',DateOfRSPS,'" ,Delivered,Null))," ") as "',DateOfRSPS,'"' ) 
+order by DateOfRSPS )  into @r1  from region_date_delivered ;
+/*Showing the output of the above query*/
+SELECT @r1;
+/* Step 3: Here we will select only those columns which will be displayed in rows with respect to which the previous column that has been transposed.
+Here we want to display the items 'Delivered' across 5 days of DateofRSPS (the column which has been transposed) with respect to Regions, HubName,FHRID,
+DeliveryType. The query will be concatenated with r1 variable set above */
+SET @r2 := concat('Select `Region-zone` , `Hub Name` , FHRID, DeliveryType, ',@r1, ', sum(if(DateOfRSPS>="01-May-2020" and DateOfRSPS<="05-May-2020",Delivered, Null)) as Total from region_date_delivered Group by FHRID Order by `Hub Name`,FHRID, delivered desc  ') ;
+/* Showing the output of the above query */
+SELECT @r2;
+/* Step 4: Preparing the statement from r2 variable above */
+Prepare sd1 from @r2 ;
+/* Step 5: Execute the statement above*/
+Execute  sd1 ;
+
+-----------------------------------------------------------TRIGGERS------------------------------------------------------------------------------------------------------
+-- Triggers
+/*DELIMITER $$ 
+CREATE TRIGGER trigger_name [BEFORE|AFTER] [INSERT|UPDATE|DELETE] 
+ON table_name FOR EACH ROW  [FOLLOWS | PRECEDES]  existing_trigger_name 
+BEGIN 
+   statement ;
+END $$ 
+DELIMITER ;
+*/
+
+Select * from tbl;  /*tbl is the original table containing data*/
+
+create table tbl_back_update  like tbl ; /*Creating another table with the same structure as tbl for data update*/
+
+Delimiter  //
+Drop trigger if exists before_tbl_update  //
+Create Trigger before_tbl_update  Before  Update
+On  tbl  for each row 
+Begin
+Insert into tbl_back_update  values (old.aut_id,old.name,old.country,old.home_city) ;
+End  //
+Delimiter  ;
+
+Update tbl set name='S. Shing' where aut_id='Aut004' ;
+Select * from tbl_back_update ; /*table to store the backup of old data before update*/
+Select * from tbl;
+
+Create table prod(Id int, Name varchar(11), Quant int );
+
+Insert into prod values (1,'pro1',200),(2,'pro2',300),(3,'pro3',400),(4,'pro4',500),(5,'pro5',600) ;
+Select * from prod ; /*New table for storing product_id, Name and quantity*/
+
+Create table prod_backup  Like  prod ; /*prod_backup with the same structure as that of prod*/
+Create table prod_log (Id int primary key auto_increment,pr_id int,pr_name varchar(11), user varchar(40) ) ; /*table to store the user details wgo made the update*/
+
+Delimiter  //
+Drop Trigger if exists after_prod_update  //
+Create Trigger after_prod_update  After  Update 
+On prod  for each row
+Begin
+Insert into prod_backup values (old.id,old.name,old.quant) ;
+End  //
+Delimiter  ;
+Select * from prod;
+Update prod set quant=590  where id=1 ;
+
+Select * from prod;
+Select * from prod_backup ; /* stores the old value before update*/
+Select * from prod_log ; /* stores user info who made the update*/
