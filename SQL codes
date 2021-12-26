@@ -1,4 +1,6 @@
 ------------------------------------------------------------------------------GROUP CONCAT-----------------------------------------------------------------------
+/*GET THE FILE FROM THIS LINK: https://drive.google.com/file/d/1MHSYyVf157pYJ0GMn8w4NIynJf2sgn2j/view?usp=sharing*/
+
 SELECT * FROM region_date_delivered;
 
 SET SQL_SAFE_UPDATES = 0;
@@ -99,3 +101,46 @@ Update prod set quant=590  where id=1 ;
 Select * from prod;
 Select * from prod_backup ; /* stores the old value before update*/
 Select * from prod_log ; /* stores user info who made the update*/
+
+Create table tbl ( Aut_id varchar(11), Name varchar(50), Country varchar(11), Home_city  varchar(20) ) ;
+
+
+Insert into tbl values  ('AUT001','William Nortonp','UK','Cambridge'),('AUT002','William Maugham','Canada','Toronto'),('AUT003','William Anthony','UK','Leeds') ,('AUT004', 'S.B.Swaminathan','India','Bangalore'),('AUT005','Thomas Morgan','Germany', 'Arnsberg'),('AUT006','Thomas Merton','USA' ,'New York'),('AUT007','Piers Gibson','UK','London'),('AUT008','Nikolai Dewey','USA','Atlanta'),('AUT009','Marquis de Ellis','Brazil','Rio De Janerio'),('AUT010','Joseph Milton','USA','Houston'),('AUT011', 'John Betjeman Hunter','Australia','Sydney'),('AUT012','Evan Hayek','Canada', 'Vancouver'),('AUT013','E. Howard','Australia','Adelaide'),('AUT014','C. J. Wilde','UK'        ,'London'),('AUT015','Butler Andre', 'USA','Florida' ),('AUT016','Ton', 'USA','CA' ) ;
+
+Select * from tbl ;
+
+Create table tbl_logs like tbl ; /* copying the structure of tbl*/
+
+Delimiter  //
+Drop trigger if exists before_tbl_delete  //
+Create Trigger before_tbl_delete  Before  Delete
+On  tbl  for each row 
+Begin
+Insert into tbl_logs  values (old.aut_id,old.name,old.country,old.home_city) ;
+End  //
+Delimiter  ;
+
+Select * from tbl where aut_id= 'AUT001' ;
+SET SQL_SAFE_UPDATES=0;
+Delete from tbl where aut_id= 'AUT001' ;
+
+Select * from tbl_logs;
+Select * from tbl;
+
+create table tbl_back_update  like tbl ;
+Select * from tbl_back_update ;
+Select * from tbl;
+
+Create table tbl_new  like tbl ;
+
+Delimiter  //
+Drop Trigger if exists  after_tbl_insert  //
+Create Trigger after_tbl_insert  After  Insert
+on tbl  for each row 
+Begin
+Insert into tbl_new values (new.aut_id,new.name,new.country,new.home_city) ;
+End  //
+Delimiter ;
+
+Insert into tbl values ('AUT018','MLG EPMO','DKL','Kal');
+Select * from tbl_new ;
